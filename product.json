@@ -1,0 +1,38 @@
+[
+  {
+    "id": 3,
+    "name": "Salted Butter",
+    "quantity": 30,
+    "price": 10.99,
+    "barcode": "345678",
+    "brand": "KCC",
+    "ingredients": "N/A"
+  },
+  {
+    "id": 4,
+    "name": "Coffee Beans",
+    "quantity": 12,
+    "price": 8.5,
+    "barcode": "",
+    "brand": "Generic",
+    "ingredients": "N/A"
+  },
+  {
+    "id": 5,
+    "name": "Test Unit",
+    "quantity": 5,
+    "price": 1.5,
+    "barcode": "9999",
+    "brand": "Generic",
+    "ingredients": "N/A"
+  },
+  {
+    "id": 6,
+    "name": "Test Unit",
+    "quantity": 5,
+    "price": 1.5,
+    "barcode": "9999",
+    "brand": "Generic",
+    "ingredients": "N/A"
+  }
+]

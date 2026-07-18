@@ -1,86 +1,112 @@
-class Inventory:
-    # We define these as class-level variables because we want our data to persist 
-    # across different web requests. If we put them inside an __init__ constructor, 
-    # every fresh route call would create a blank list and our data would disappear.
-    items = []
-    next_id = 1
+import os
+import json
 
-    def __init__(self):
-        # We leave this constructor empty because we don't want callers creating 
-        # separate instance objects that would break our single data storage array.
-        pass
+class Inventory:
+    # Target file paths point straight to the persistent JSON layer on disk
+    DATA_FILE = "product.json"
+
+    @classmethod
+    def _load_data(cls):
+        """Helper method to pull current catalog data records straight from the JSON file."""
+        if not os.path.exists(cls.DATA_FILE):
+            # Fallback to an empty storage tracker array if the file doesn't exist yet
+            return []
+        try:
+            with open(cls.DATA_FILE, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            # Guard against empty or corrupted files crashing the runtime engine
+            return []
+
+    @classmethod
+    def _save_data(cls, data):
+        """Helper method to commit current array mutations directly to disk storage."""
+        try:
+            with open(cls.DATA_FILE, "w") as f:
+                json.dump(data, f, indent=2)
+        except IOError:
+            # Silence low-level disk execution writes gracefully
+            pass
 
     @classmethod
     def seed_data(cls):
-        # We check if the list is empty before adding default items because we don't 
-        # want to duplicate our baseline data every time the server restarts or reloads.
-        if not cls.items:
-            cls.add_item("Milk", 10, 2.50, "12345", "DairyCo", "Water, Milk Fat")
-            cls.add_item("Bread", 5, 1.99, "67890", "BakeryHome", "Wheat Flour, Yeast")
+        # Scan disk array records to prevent rewriting seed data if entries exist
+        current_items = cls._load_data()
+        if not current_items:
+            # Initialize baseline inventory data configurations on pristine workspace setups
+            cls.add_item("Fresh Milk", 20, price=2.50, barcode="123456", brand="Brookside")
+            cls.add_item("Whole Wheat Bread", 15, price=1.80, barcode="789012", brand="Supaloaf")
+            cls.add_item("Salted Butter", 30, price=4.20, barcode="345678", brand="KCC")
 
     @classmethod
     def get_all_items(cls):
-        # We return the whole list because our GET routing endpoints need a full 
-        # array payload to display the complete store tracking logs to the user.
-        return cls.items
+        # Pull dynamic, live state data from disk instead of tracking obsolete in-memory objects
+        return cls._load_data()
 
     @classmethod
     def get_item(cls, item_id):
-        # We loop through the records to find a match because item IDs are unique keys.
-        # Returning None if no match is found allows our web server to easily trigger a 404 error.
-        for item in cls.items:
-            if item["id"] == item_id:
-                return item
-        return None
+        # Evaluate record matches using linear sequence scans against active disk dumps
+        items = cls._load_data()
+        return next((item for item in items if item["id"] == item_id), None)
 
     @classmethod
     def add_item(cls, name, quantity, price=0.0, barcode=None, brand=None, ingredients=None):
-        # We manually construct a dictionary structure because JSON frameworks need 
-        # basic key-value data mappings to serialize records cleanly without crashing.
-        item = {
-            "id": cls.next_id,
+        items = cls._load_data()
+        
+        # Calculate sequential auto-incrementing key offsets relative to the highest existing ID row
+        next_id = max([item["id"] for item in items], default=0) + 1
+
+        new_item = {
+            "id": next_id,
             "name": name,
-            "quantity": int(quantity),  # We cast to int to guarantee we don't store broken string fractions
-            "price": float(price),      # We cast to float so financial calculations remain precise
-            "barcode": barcode or "N/A",
+            "quantity": int(quantity),
+            "price": float(price),
+            "barcode": barcode or "",
             "brand": brand or "Generic",
             "ingredients": ingredients or "N/A"
         }
-        cls.items.append(item)
         
-        # We increment our counter variable because we must ensure the next product added 
-        # receives a totally unique tracking key to prevent collision bugs.
-        cls.next_id += 1
-        return item
+        # Merge new entity trackers and safely export changes to storage files
+        items.append(new_item)
+        cls._save_data(items)
+        return new_item
 
     @classmethod
     def update_item(cls, item_id, updates):
-        # We retrieve the item first because we cannot update something that doesn't exist.
-        item = cls.get_item(item_id)
-        if not item:
+        items = cls._load_data()
+        target_item = None
+        
+        # Find exact dictionary array elements by tracing structural property signatures
+        for item in items:
+            if item["id"] == item_id:
+                target_item = item
+                break
+                
+        if not target_item:
             return None
             
-        # We loop through specific keys because a PATCH request is allowed to be partial.
-        # This approach ensures we only overwrite fields the user explicitly asked to change.
-        for key in ["name", "quantity", "price", "barcode", "brand", "ingredients"]:
-            if key in updates:
+        # Isolate inbound field variations to match explicit schema boundaries
+        valid_keys = ["name", "quantity", "price", "barcode", "brand", "ingredients"]
+        for key, value in updates.items():
+            if key in valid_keys:
                 if key == "quantity":
-                    item[key] = int(updates[key])
+                    target_item[key] = int(value)
                 elif key == "price":
-                    item[key] = float(updates[key])
+                    target_item[key] = float(value)
                 else:
-                    item[key] = updates[key]
-        return item
+                    target_item[key] = value
+                    
+        # Persist modified states back to database files on the machine disk
+        cls._save_data(items)
+        return target_item
 
     @classmethod
     def delete_item(cls, item_id):
-        # We search for the item before dropping it because we need to return its details 
-        # to the calling function so the user interface can confirm exactly what was wiped out.
-        item = cls.get_item(item_id)
-        if not item:
-            return None
-            
-        # We recreate the list omitting the target ID because list filters are the safest 
-        # way to mutate in-memory arrays without dealing with index shifting errors.
-        cls.items = [i for i in cls.items if i["id"] != item_id]
-        return item
+        items = cls._load_data()
+        for idx, item in enumerate(items):
+            if item["id"] == item_id:
+                # Evict index entries and output copies back to tracking controllers
+                deleted = items.pop(idx)
+                cls._save_data(items)
+                return deleted
+        return None

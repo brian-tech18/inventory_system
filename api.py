@@ -2,8 +2,8 @@ import requests
 
 # We define these URL string configurations as clear global constants because changing 
 # API version routes or staging domains in the future shouldn't force us to hunt through methods.
-OPENFOODFACTS_PRODUCT_URL = "https://openfoodfacts.org{barcode}.json"
-OPENFOODFACTS_SEARCH_URL = "https://openfoodfacts.org"
+OPENFOODFACTS_PRODUCT_URL = "https://world.openfoodfacts.org/api/v0/product/{barcode}.json"
+OPENFOODFACTS_SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
 
 # We must explicitly declare a descriptive User-Agent header string because the OpenFoodFacts 
 # server firewall automatically blocks default Python scripts to protect their system from bad bots.
