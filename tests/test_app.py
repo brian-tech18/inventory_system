@@ -1,23 +1,39 @@
 import unittest
-import sys
 import os
-
-# Append the parent directory to system paths so tests can find app.py cleanly
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+import json
 from app import app
 from inventory import Inventory
 
 class TestInventorySystem(unittest.TestCase):
     def setUp(self):
-        # Refresh and flush class array variables to prevent state leak contamination
-        Inventory.items = []
-        Inventory.next_id = 1
-        Inventory.seed_data()
-        self.api = Inventory
+        # Point tests to a temporary JSON file so product.json is not modified
+        Inventory.DATA_FILE = "test_product.json"
         
-        # Instantiate localized engine wrapper to run headless request pipeline simulation calls
+        # Reset test JSON file to clean seed data
+        initial_data = [
+            {
+                "id": 1,
+                "name": "Fresh Milk",
+                "quantity": 20,
+                "price": 2.50,
+                "barcode": "123456",
+                "brand": "Brookside",
+                "ingredients": "N/A"
+            }
+        ]
+        with open(Inventory.DATA_FILE, "w") as f:
+            json.dump(initial_data, f)
+            
+        self.api = Inventory
         self.client = app.test_client()
+
+    def tearDown(self):
+        # Clean up temporary test file after runs
+        if os.path.exists("test_product.json"):
+            os.remove("test_product.json")
+            
+        # Restore original DATA_FILE reference
+        Inventory.DATA_FILE = "product.json"
 
     def test_core_creation(self):
         item = self.api.add_item("Test Unit", 5, price=1.5, barcode="9999")
@@ -25,21 +41,14 @@ class TestInventorySystem(unittest.TestCase):
         self.assertEqual(item["quantity"], 5)
 
     def test_core_modification(self):
-        # Dynamically resolve live array states to avoid un-subscriptable None type crashes
-        items = self.api.get_all_items()
-        target_id = items[0]["id"] if items else 1
-        
-        updated = self.api.update_item(target_id, {"price": 10.99})
+        updated = self.api.update_item(1, {"price": 10.99})
         self.assertIsNotNone(updated)
         self.assertEqual(updated["price"], 10.99)
 
     def test_core_deletion(self):
-        items = self.api.get_all_items()
-        target_id = items[0]["id"] if items else 1
-        
-        deleted = self.api.delete_item(target_id)
-        self.assertEqual(deleted["id"], target_id)
-        self.assertIsNone(self.api.get_item(target_id))
+        deleted = self.api.delete_item(1)
+        self.assertEqual(deleted["id"], 1)
+        self.assertIsNone(self.api.get_item(1))
 
     def test_get_all_endpoint(self):
         res = self.client.get("/inventory")
@@ -47,6 +56,7 @@ class TestInventorySystem(unittest.TestCase):
 
     def test_route_creation_and_mutation_flow(self):
         payload = {"name": "Test Run Drink", "quantity": 10, "price": 2.50}
+        
         create_res = self.client.post("/inventory", json=payload)
         self.assertEqual(create_res.status_code, 201)
         
